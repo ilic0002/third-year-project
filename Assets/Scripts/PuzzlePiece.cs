@@ -1,38 +1,93 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
-public class PuzzlePiece : MonoBehaviour, IDragHandler, IBeginDragHandler, IEndDragHandler
+public class PuzzlePiece : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
 {
+    public Vector2 originalPosition;          
+    private RectTransform rectTransform;      
+    private Canvas canvas;                    
+    public RectTransform targetArea;          
+    public bool isCorrectlyPlaced = false;    
+    public PuzzleManager puzzleManager;       
+
+    public Sprite puzzlePieceSprite;
+
+    void Start()
+{
+    rectTransform = GetComponent<RectTransform>(); 
+    if (rectTransform == null)
+    {
+        Debug.LogError("Missing RectTransform component on PuzzlePiece!");
+        return;
+    }
+
+    canvas = GetComponentInParent<Canvas>(); 
+    if (canvas == null)
+    {
+        Debug.LogError("Missing Canvas component in parent of PuzzlePiece!");
+        return;
+    }
+
+    // Assign the sprite to the Image component
+    Image imageComponent = GetComponent<Image>();
+    if (imageComponent != null && puzzlePieceSprite != null)
+    {
+        imageComponent.sprite = puzzlePieceSprite;
+    }
+    else
+    {
+        Debug.LogWarning("No Image component or Sprite found on PuzzlePiece.");
+    }
+}
+
+    public void Initialize(RectTransform target, PuzzleManager manager)
+    {
+        targetArea = target;          // Assign the target area
+        puzzleManager = manager;      // Assign the PuzzleManager reference
+        isCorrectlyPlaced = false;    // Reset placement status
+        originalPosition = rectTransform.position; // Store initial position
+    }
+
     public void OnBeginDrag(PointerEventData eventData)
     {
-        // Logic to handle the beginning of a drag (e.g., change color)
-        GetComponent<Renderer>().material.color = Color.yellow; // Example: change color on drag start
+        rectTransform.SetAsLastSibling();  // Bring this piece to the front while dragging
     }
 
     public void OnDrag(PointerEventData eventData)
     {
-        // Move the piece with the mouse
-        transform.position = eventData.position; // Move to the current mouse position
+        if (canvas.renderMode == RenderMode.WorldSpace)
+        {
+            rectTransform.position = eventData.position; // Use world position for world space canvas
+        }
+        else
+        {
+            rectTransform.position = eventData.position / canvas.scaleFactor; // For screen space canvas
+        }
     }
 
     public void OnEndDrag(PointerEventData eventData)
     {
-        // Logic to handle when dragging ends (e.g., snap to grid)
-        // Example: snapping the piece to the nearest grid position
-        SnapToGrid();
-        GetComponent<Renderer>().material.color = Color.white; // Reset color on drag end
+        if (isCorrectlyPlaced)
+        {
+            return; // If the piece is already placed correctly, do nothing
+        }
+
+        if (RectTransformUtility.RectangleContainsScreenPoint(targetArea, rectTransform.position, null))
+        {
+            rectTransform.position = targetArea.position;
+            isCorrectlyPlaced = true;
+
+            puzzleManager.CheckPuzzleCompletion(); // Notify manager
+        }
+        else
+        {
+            rectTransform.position = originalPosition; // Return to original position
+        }
     }
 
-    private void SnapToGrid()
+    public bool IsPlacedCorrectly()
     {
-        // Implement snapping logic here
-        // For example, you can round the position to the nearest grid point
-        float gridSize = 1.0f; // Adjust this to your grid size
-        Vector3 newPosition = new Vector3(
-            Mathf.Round(transform.position.x / gridSize) * gridSize,
-            Mathf.Round(transform.position.y / gridSize) * gridSize,
-            transform.position.z
-        );
-        transform.position = newPosition; // Snap to calculated position
+        return isCorrectlyPlaced;
     }
 }
